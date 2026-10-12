@@ -1310,6 +1310,39 @@ const DEFAULTS = {
   unit: "Miles",
 };
 
+// Remembered settings (v26.1): the main toggles persist per browser via
+// localStorage. Every read/write is wrapped in try/catch and every stored value
+// is validated against its option list, so blocked storage or stale values fall
+// back silently to DEFAULTS. Search text and the compare tray are not saved.
+const PREFS_KEY = "school-register-prefs-v1";
+function loadPrefs() {
+  const out = { ...DEFAULTS };
+  try {
+    const raw = window.localStorage.getItem(PREFS_KEY);
+    if (!raw) return out;
+    const saved = JSON.parse(raw);
+    const allowed = {
+      sortBy: SORTS.map((x) => x.id),
+      direction: ["asc", "desc"],
+      typeFilter: TYPE_FILTERS,
+      bandingFilter: BANDING_FILTERS,
+      faithFilter: FAITH_FILTERS,
+      faithFitFilter: FAITH_FIT_FILTERS,
+      boroughFilter: BOROUGHS,
+      viewMode: VIEW_MODES,
+      unit: UNIT_OPTIONS,
+    };
+    Object.keys(allowed).forEach((k) => {
+      if (saved && allowed[k].includes(saved[k])) out[k] = saved[k];
+    });
+  } catch (e) { /* storage unavailable or corrupt: use defaults */ }
+  return out;
+}
+function savePrefs(prefs) {
+  try { window.localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch (e) { /* ignore */ }
+}
+const SAVED_PREFS = loadPrefs();
+
 function getSortValue(school, sortBy) {
   if (sortBy === "distance") return school.distance;
   if (sortBy === "ofsted") return OFSTED_RANK[school.ofsted] ?? null;
@@ -1416,20 +1449,23 @@ function CompareTray({ ids, onClear, onRemove, open, setOpen, unit }) {
 }
 
 function App() {
-  const [sortBy, setSortBy] = useState(DEFAULTS.sortBy);
+  const [sortBy, setSortBy] = useState(SAVED_PREFS.sortBy);
   const [query, setQuery] = useState(DEFAULTS.query);
-  const [direction, setDirection] = useState(DEFAULTS.direction);
-  const [typeFilter, setTypeFilter] = useState(DEFAULTS.typeFilter);
-  const [bandingFilter, setBandingFilter] = useState(DEFAULTS.bandingFilter);
-  const [faithFilter, setFaithFilter] = useState(DEFAULTS.faithFilter);
-  const [faithFitFilter, setFaithFitFilter] = useState(DEFAULTS.faithFitFilter);
-  const [boroughFilter, setBoroughFilter] = useState(DEFAULTS.boroughFilter);
-  const [viewMode, setViewMode] = useState(DEFAULTS.viewMode);
-  const [unit, setUnit] = useState(DEFAULTS.unit);
+  const [direction, setDirection] = useState(SAVED_PREFS.direction);
+  const [typeFilter, setTypeFilter] = useState(SAVED_PREFS.typeFilter);
+  const [bandingFilter, setBandingFilter] = useState(SAVED_PREFS.bandingFilter);
+  const [faithFilter, setFaithFilter] = useState(SAVED_PREFS.faithFilter);
+  const [faithFitFilter, setFaithFitFilter] = useState(SAVED_PREFS.faithFitFilter);
+  const [boroughFilter, setBoroughFilter] = useState(SAVED_PREFS.boroughFilter);
+  const [viewMode, setViewMode] = useState(SAVED_PREFS.viewMode);
+  const [unit, setUnit] = useState(SAVED_PREFS.unit);
   const [panelExpanded, setPanelExpanded] = useState(() => (typeof window !== "undefined" ? window.innerWidth >= 640 : true));
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [compareIds, setCompareIds] = useState([]);
   const [compareOpen, setCompareOpen] = useState(false);
+  useEffect(() => {
+    savePrefs({ sortBy, direction, typeFilter, bandingFilter, faithFilter, faithFitFilter, boroughFilter, viewMode, unit });
+  }, [sortBy, direction, typeFilter, bandingFilter, faithFilter, faithFitFilter, boroughFilter, viewMode, unit]);
   const COMPARE_MAX = 4;
   function toggleCompare(id) {
     setCompareIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : cur.length >= COMPARE_MAX ? cur : [...cur, id]));
